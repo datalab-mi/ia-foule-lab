@@ -1,0 +1,12 @@
+pandas>=1.2.0
+torchvision==0.10
+numpy==1.20.3
+opencv_python==4.5.3.56
+h5py==3.4.0
+onnxruntime==1.8.1
+matplotlib
+torch
+scipy
+pillow
+matplotlib
+tqdm
