@@ -6,22 +6,22 @@ class DDCB(nn.Module):
     def __init__(self, in_planes):
         super(DDCB, self).__init__()
         self.conv1 = nn.Sequential(
-            nn.Conv2d(in_planes, 256, 1, bias=True), 
+            nn.Conv2d(in_planes, 256, 1, bias=False), 
             nn.ReLU(), 
-            nn.Conv2d(256, 64, 3, padding=1, bias=True), 
+            nn.Conv2d(256, 64, 3, padding=1, bias=False), 
             nn.ReLU())
         self.conv2 = nn.Sequential(
-            nn.Conv2d(in_planes + 64, 256, 1, bias=True), 
+            nn.Conv2d(in_planes + 64, 256, 1, bias=False), 
             nn.ReLU(), 
-            nn.Conv2d(256, 64, 3, padding=2, dilation=2, bias=True),
+            nn.Conv2d(256, 64, 3, padding=2, dilation=2, bias=False),
             nn.ReLU())
         self.conv3 = nn.Sequential(
-            nn.Conv2d(in_planes + 64 * 2, 256, 1, bias=True), 
+            nn.Conv2d(in_planes + 64 * 2, 256, 1, bias=False), 
             nn.ReLU(), 
-            nn.Conv2d(256, 64, 3, padding=3, dilation=3, bias=True),
+            nn.Conv2d(256, 64, 3, padding=3, dilation=3, bias=False),
             nn.ReLU())
         self.conv4 = nn.Sequential(
-            nn.Conv2d(in_planes + 64 * 3, 512, 3, padding=1, bias=True))
+            nn.Conv2d(in_planes + 64 * 3, 512, 3, padding=1, bias=False))
 
     def forward(self, x):
         x1_raw = self.conv1(x)

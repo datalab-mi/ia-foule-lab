@@ -17,8 +17,7 @@ def validation(model, test_loader, cuda=True):
             output = model(img)
             est_count = output.sum().item()
             mae += abs(est_count - count)
-            mse += (est_count - count) ** 2
+            mse += (est_count - count) **2
     mae /= len(test_loader)
     mse /= len(test_loader)
-    rmse = mse ** 0.5
-    return float(mae), float(rmse)
+    return float(mae), float(mse)
