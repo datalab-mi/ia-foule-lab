@@ -399,9 +399,9 @@ def show_image_with_density(density_map, df_paths, label=None, show_image=True, 
         plt.imshow(plt.imread(path_img), alpha=alpha)
     plt.imshow(density_map[label], alpha=alpha)
     if save_file_directory is not None:
-        save_file_path = 'density_map.png'
+        save_file_name = label+'.density_map.png'
         if save_file_suffix is not None:
-            save_file_path = 'density_map_' + save_file_suffix + '.png'
+            save_file_path = label +'.density_map.'+save_file_suffix+'.png'
         plt.savefig(os.path.join(save_file_directory, save_file_path))
 
 
