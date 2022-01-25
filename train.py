@@ -67,7 +67,7 @@ ms_time = 500
 lr = 1e-6
 weight_decay = 1e-4
 
-# mean and std VGG
+# mean and std ImageNet
 mean_norm = [0.485, 0.456, 0.406]
 std_norm = [0.229, 0.224, 0.225]
 
@@ -116,14 +116,17 @@ test_loader = CreateLoader(test_paths,
                              img_transformer=transform,
                              num_worker=4)
 
-
+path_saved_model = os.path.join(save_path, f'{method}_{dataset_name}.pth')
 train_loss = 0
 best_mae, _  = validation(net, test_loader, cuda=GPU)
 
-for epoch in range(n_epochs):
+for epoch in range(first_epoch, n_epochs):
     train_loss = 0.0
     net.train()
     n = 0
+    max_loss = 0
+    
+    # do epoch
     for img, target, count in train_loader:
         n += 1
         optimizer.zero_grad()
@@ -137,17 +140,27 @@ for epoch in range(n_epochs):
         if custom_loss:
             lc_loss = compute_lc_loss(output, target)
             loss = loss + lbda * lc_loss
+            
+        if loss.item() > max_loss:
+            max_loss = loss.item()
+            gt = target.sum()
+            pr = output.sum()
+    
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
+        
         if (n % ms_time) == 0 or (n == len(train_loader)):
             ms_data = f'Loss: {train_loss/n:>9f} [{n:>5d}/{len(train_loader):>5d}]'
             logger.info(ms_data)
-
+    
+    # each epoch validate
     mae, rmse = validation(net, test_loader, cuda=GPU)
-
-    ms_epoch = f'Epoch {epoch+1}/{n_epochs} Loss: {train_loss/len(train_loader):>15f}, MAE: {mae:>2f}, RMSE: {rmse:>2f}, Best MAE: {best_mae:>2f}'
+    ms_epoch = (f'Epoch {epoch+1}/{n_epochs} Loss: {train_loss/len(train_loader):>15f}, '
+                f'MAE: {mae:>2f}, RMSE: {rmse:>2f}, Best MAE: {best_mae:>2f}, MAX: {max_loss:>9f} pred: {pr:>2f} - gt: {gt:>2f}')
     logger.info(ms_epoch)
+    
+    # save good models
     if mae < best_mae:
         best_mae = mae
         saved_model = {
@@ -155,5 +168,12 @@ for epoch in range(n_epochs):
             'model_state_dict': net.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': loss}
-        torch.save(saved_model, os.path.join(save_path, f'{method}_{dataset_name}.pth'))
+        torch.save(saved_model, path_saved_model)
 
+
+if saved_model.is_file():
+    checkpoint = torch.load(path_saved_model)
+    net.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    first_epoch = checkpoint['epoch']
+    loss = checkpoint['loss']
