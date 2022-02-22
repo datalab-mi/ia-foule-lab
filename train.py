@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import cv2
 from torchvision import transforms
 
-from iafoule.models import MCNN, DenseScaleNet
+from iafoule.models import MCNN, DenseScaleNet, MobileCount
 from iafoule.utils import normalize_target, get_logger, compute_lc_loss, Timer
 from iafoule.loader import CreateLoader, validation
 from iafoule.writing_text import write, random_date
@@ -26,12 +26,13 @@ def writing(img_array):
     im_data = write(60, 3 , random_date(), im_data)
     return im_data
 
-
 # args script
 availables_models = {'mcnn' : MCNN,
-                    'dsnet': DenseScaleNet}
+                    'dsnet': DenseScaleNet,
+                    'mb': MobileCount}
 
 input_grayscale = {'mcnn': True,
+                   'mb': False,
                    'dsnet': False}
 
 args = parse_args()
@@ -41,11 +42,11 @@ grayscale = input_grayscale[method]
 net = availables_models[method]
 
 # create train and test sample with less 500 persons
-path_truth = f'/workspace/data/{dataset_name}/maps_adaptive_kernel/'
-save_path = '/workspace/data/models/'
+path_truth = f'/workspace/data/{dataset_name}/density/maps_adaptive_kernel/'
+save_path = './models/'
 
-paths = pd.read_csv('/workspace/data/GCC/gcc_mapping.csv') # change name
-selected_paths = paths[paths['n_persons'] < 500]
+paths = pd.read_csv('./data/GCC/density/gcc_mapping.csv') # change name
+selected_paths = paths#[paths['n_persons'] < 500]
 
 # shuffle because images are sorted by scene
 shuffle_path = selected_paths["path_img"].sample(frac=1).reset_index(drop=True)
@@ -85,7 +86,7 @@ optimizer = torch.optim.Adam(filter(lambda p:
                                     net.parameters()), 
                              lr=lr, weight_decay=weight_decay)
 criterion = torch.nn.MSELoss()
-logger = get_logger('/workspace/data/logs/gcc_dsnet.txt')
+logger = get_logger(f'./data/logs/{dataset_name}_{method}.txt')
 
 # add functions
 transform = transforms.Compose([writing,

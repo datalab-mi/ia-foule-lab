@@ -3,10 +3,14 @@ import pickle
 import os
 import json
 import h5py
+import logging
+import pathlib
+import gc
 
 from contextlib import closing
 from pathlib import Path
-from tqdm.notebook import tqdm as notebook_tqdm
+from tqdm import tqdm
+#from tqdm.notebook import tqdm as notebook_tqdm
 from scipy.io import loadmat
 from scipy.ndimage import gaussian_filter
 from scipy import spatial
@@ -19,6 +23,20 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+def create_logger():
+    # logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.WARNING)
+
+    # handler
+    ch = logging.StreamHandler()
+    formatter = logging.Formatter(('%(asctime)s '
+                                   '- %(levelname)s - %(message)s'), 
+                                  datefmt='%Y-%m-%d %I:%M:%S')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    return logger
+
 
 def get_img_pathes(root_path, 
                    extensions=['jpg', 'png', 'jpeg'], 
@@ -26,9 +44,12 @@ def get_img_pathes(root_path,
     """
     Return all images with extensions from all pathes in 'root_path'
     """
+    logger = create_logger()
     img_pathes = []
+    weather = kwargs.get('metadata_weather', None)
+    time_info = kwargs.get('metadata_time_info', None)
     for ext in extensions:
-        for img_path in Path(data_path).rglob(f'*.{ext}'):
+        for img_path in Path(root_path).rglob(f'*.{ext}'):
             dict_path = {}
             path_img = str(img_path.parent)
             file_img = str(img_path.name)
@@ -40,27 +61,53 @@ def get_img_pathes(root_path,
                 file_m = str(img_path.name).replace(str(img_path.suffix), kwargs["ext"])
                 dict_path["file_m"] = os.path.join(path_m, file_m)
                 try:
+                    metadata_gt = get_gt_dots(dict_path["file_m"], metadata=True)
                     dict_path["n_persons"] = len(get_gt_dots(dict_path["file_m"]))
+                    if weather is not None:
+                        dict_path["weather"] = metadata_gt[weather]
+                    if time_info is not None:
+                        dict_path["time"] = metadata_gt[time_info]
+                    # add other metadata if available
                 except FileNotFoundError:
+                    logger.warning(f'File {dict_path["file_m"]} not found.')
                     continue
             img_pathes.append(dict_path)
     return pd.DataFrame(img_pathes)
 
 
 
-def get_gt_dots(mat_path, img_width=None, img_height=None):
+def get_gt_dots(gt_path, metadata=False):
     """
-    Load Matlab file with ground truth labels and save it to numpy array.
-    ** cliping is needed to prevent going out of the array
+    Load Matlab or Json file with ground truth labels and save it to numpy array.
+        ** cliping is needed to prevent going out of the array (not implemented)
     """
-    mat = loadmat(mat_path)
-    gt = mat["image_info"][0][0][0].astype(int)
+    ext = pathlib.Path(gt_path).suffix
+    if ext == '.mat':
+        mat = loadmat(gt_path)
+        if metadata:
+            return mat
+        gt = mat["image_info"][0][0][0].astype(int)
+    elif ext == '.json':
+        jsf = loadjson(gt_path)
+        gt = np.array(jsf["image_info"])
+        if metadata:
+            return jsf
+    else:
+        gt = None
     return gt
+
+def loadjson(file):
+    """
+    Load json file
+    """
+    with open(file, 'r') as f:
+        j = json.loads(f.read())
+    return j
 
 
 
 def compute_distances(img_paths, 
-                      mat_paths, 
+                      gt_paths, 
                       out_folder_path='.', 
                       out_dist_path='distances_dict.pkl', 
                       n_neighbors=4, 
@@ -69,11 +116,11 @@ def compute_distances(img_paths,
     # calculate distance for each images and each point between theirs n neighbors 
     distances_dict = dict()
     
-    for i_path, m_path in notebook_tqdm(zip(img_paths, mat_paths)):
+    for i_path, gt_path in tqdm(zip(img_paths, gt_paths)):
         # load truth values
         img = plt.imread(i_path)
         height, width, dim = img.shape
-        points = get_gt_dots(m_path, height, width)
+        points = get_gt_dots(gt_path)
         if len(points) > 0:
             # build tree distances with truth values and add to object
             tree = spatial.KDTree(points.copy()) 
@@ -112,7 +159,7 @@ def generate_gaussian_kernels(sigma_min=0,
     kernels_dict = dict()
     eps = 1e-4
     sigma_space = np.arange(sigma_min, sigma_max + eps, sigma_step)
-    for sigma in notebook_tqdm(sigma_space):
+    for sigma in tqdm(sigma_space):
         sigma = np.round(sigma, decimals=round_decimals)
         
         if fixed_shape is None:
@@ -249,39 +296,57 @@ def gaussian_filter_density(points,
 
 def save_computed_density(density_map, 
                           filename, 
-                          data_root='.', 
+                          data_root='.',
+                          erase=False,
                           method='sparse',
                           out_folder='maps_adaptive_kernel'):
     """
-    Save density map to h5py format
+    Save density map to h5py format or npz
     """
     full_path = os.path.join(data_root, out_folder)
-    
+    full_file = os.path.join(full_path, filename)
+
     if not os.path.isdir(full_path):
         print(f'Creating {full_path}')
         os.makedirs(full_path)
     
+    
     if method == 'h5':
-        with closing(h5py.File(os.path.join(full_path, filename + '.h5'), 'w')) as hf:
+        if not erase:
+            if pathlib.Path(full_file + '.h5').is_file():
+                return None
+        with closing(h5py.File(full_file + '.h5'), 'w') as hf:
             hf['density'] = density_map
     
     if method == 'sparse':
-        scipy.sparse.save_npz(os.path.join(full_path, filename), 
+        if not erase:
+            if pathlib.Path(full_file).is_file():
+                return None
+        scipy.sparse.save_npz(full_file, 
                               scipy.sparse.bsr_matrix(density_map))
         
-        
 class DensityMap:
+    """
+    Class for generate Density maps
+    """
     
     def __init__(self,
                  imgs_paths, 
-                 mats_paths, 
-                 data_path='.', 
+                 gt_paths, 
+                 save_data_path='.', 
                  kernels=None, 
                  **kwargs):
-        
-        self.data_path = data_path
+        """
+        Prepare data for loading density maps
+            - imgs_paths : list, images pathes
+            - gt_paths: list, ground truth pathes
+            - data_path: where is stored directory
+            - kernels: use precomputed kernels
+            - kwargs: params for `generate_gaussian_kernels` function
+        """
+        self.save_data_path = save_data_path
         self.imgs_paths = imgs_paths
-        self.mats_paths = mats_paths
+        self.gt_paths = gt_paths
         
         
         # load kernels 
@@ -289,10 +354,10 @@ class DensityMap:
             self.kernels = kernels
         elif isinstance(kernels, str):
             try:
-                with open(os.path.join(data_path, kernels), 'rb') as f:
+                with open(os.path.join(self.save_data_path, kernels), 'rb') as f:
                     self.kernels = pickle.loads(f.read())
             except FileNotFoundError:
-                print(f"File {os.path.join(data_path, kernels)} not found")
+                print(f"File {os.path.join(self.save_data_path, kernels)} not found")
                 self.kernels = generate_gaussian_kernels(**kwargs, save=False)
         else:
             print('No precomputed kernels founds.')
@@ -307,15 +372,38 @@ class DensityMap:
                              metric='mean',
                              distance=None,
                              save=False,
+                             erase=True,
                              save_method='sparse',
                              map_out_folder='maps_adaptive_kernel'):
-
+        """
+        Generate density maps with different parameters:
+        - method : int, compute sigma for gaussian kernel with different methods :
+                    * method = 1 : adaptative kernel**, sigma is mean of distance to `x` 
+                                    nearest neighbors * beta
+                    * method = 2 : adaptative kernel, sigma is distance 
+                                    to the nearest neighbor
+                    * method = 3 : fixed kernel, sigma is a fixed value
+               
+                ** in case of one point on the image : sigma = 'fixed_sigma'
+        - beta: float, parameter for distance in method 1. NOTE: paper use beta = 0.3.
+        - fixed_sigma: int, essentially parameter for method 2. Use the same sigma for all kernels.
+        - min_sigma: int, sigma threshold. If sigma lower than min_sigma, this parameter will be used.
+        - n_neighbors: int, number of neighbors for calcul sigma with adaptative methods. 
+                        NOTE: paper use neighbors = 3
+        - metric: str, metric use for nearest neighbors : 'sum' or 'mean'
+        - distance: dict or str, if use an adaptative method, load dict of distances or json file
+        - save: bool, save images in local
+        - save_method: str, method for save density maps. Default 'sparse' or 'h5' (more sized).
+        - map_out_folder: str, name of folder created where density map are stored. 
+                         Default 'maps_adaptive_kernel'
+        """
+        
         density_map_dict = {}
         # load distances if adaptative kernels
         if method in (1, 2):
             # load distance file
             if isinstance(distance, str):
-                with open(os.path.join(self.data_path, distance), 'rb') as f:
+                with open(os.path.join(self.save_data_path, distance), 'rb') as f:
                     distances_dict = pickle.loads(f.read())
             # load distance dict
             elif isinstance(distance, dict):
@@ -324,11 +412,11 @@ class DensityMap:
             else:
                 raise TypeError("Les distances n'ont pas pu être chargées")
     
-        for img_path, mat_path in notebook_tqdm(zip(self.imgs_paths, self.mats_paths)):
+        for img_path, gt_path in tqdm(zip(self.imgs_paths, self.gt_paths)):
             # load img and truths values
             img = Image.open(img_path)
             width, height = img.size
-            gt_points = get_gt_dots(mat_path)
+            gt_points = get_gt_dots(gt_path)
             
             if method in (1, 2):
                 distance = distances_dict[img_path]
@@ -349,20 +437,29 @@ class DensityMap:
             if save:
                 save_computed_density(density_map, 
                                       filename=filename,
+                                      erase=erase,
                                       method=save_method,
-                                      data_root=self.data_path,
+                                      data_root=self.save_data_path,
                                       out_folder=map_out_folder)
 
             density_map_dict[filename] = density_map
         return density_map_dict
     
     
-def show_image_with_density(density_map, df_paths, label=None, show_image=True):
+def show_image_with_density(density_map, df_paths, 
+                            label=None, 
+                            alpha=0.7,
+                            show_image=True, 
+                            figsize=(12,12)):
+    plt.figure(figsize=figsize)
     if label is None:
         label = np.random.choice(list(density_map.keys()))
-    path_img = df_paths[df_paths.filename.astype(str) == label].iloc[0].path_img
+    row = df_paths[df_paths.filename.astype(str) == label].iloc[0]
+    path_img = row.path_img
+    n_person = row.n_persons
     if show_image:
-        alpha = 0.7
-        plt.imshow(plt.imread(path_img), alpha=alpha)
+        plt.imshow(plt.imread(path_img))
     plt.imshow(density_map[label], alpha=alpha)
-    print(str(label))
+    plt.axis('off')
+    print(f'Image n°{str(label)}\nDensity de personne : {np.round(density_map[label].sum(), 3)}'
+          f'\nNombre de personne {n_person}')
