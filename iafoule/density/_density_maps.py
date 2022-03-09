@@ -48,6 +48,9 @@ def get_img_pathes(root_path,
     img_pathes = []
     weather = kwargs.get('metadata_weather', None)
     time_info = kwargs.get('metadata_time_info', None)
+    gt_key = kwargs.get('gt_key', "image_info")
+    images_folder = kwargs.get('images_folder', 'pngs')
+    just_ext_added = kwargs.get('just_ext_added', '')
     for ext in extensions:
         for img_path in Path(root_path).rglob(f'*.{ext}'):
             dict_path = {}
@@ -57,12 +60,15 @@ def get_img_pathes(root_path,
             dict_path["filename"] = img_path.stem
 
             if kwargs:
-                path_m = str(img_path.parent).replace('pngs', kwargs["folder"])
-                file_m = str(img_path.name).replace(str(img_path.suffix), kwargs["ext"])
+                path_m = str(img_path.parent).replace(images_folder, kwargs["folder"])
+                if just_ext_added:
+                    file_m = str(img_path.name) + kwargs["ext"]
+                else:
+                    file_m = str(img_path.name).replace(str(img_path.suffix), kwargs["ext"])
                 dict_path["file_m"] = os.path.join(path_m, file_m)
                 try:
-                    metadata_gt = get_gt_dots(dict_path["file_m"], metadata=True)
-                    dict_path["n_persons"] = len(get_gt_dots(dict_path["file_m"]))
+                    metadata_gt = get_gt_dots(dict_path["file_m"], metadata=True, gt_key=gt_key)
+                    dict_path["n_persons"] = len(get_gt_dots(dict_path["file_m"], gt_key=gt_key))
                     if weather is not None:
                         dict_path["weather"] = metadata_gt[weather]
                     if time_info is not None:
@@ -76,7 +82,7 @@ def get_img_pathes(root_path,
 
 
 
-def get_gt_dots(gt_path, metadata=False):
+def get_gt_dots(gt_path, metadata=False, gt_key='points'):
     """
     Load Matlab or Json file with ground truth labels and save it to numpy array.
         ** cliping is needed to prevent going out of the array (not implemented)
@@ -86,10 +92,22 @@ def get_gt_dots(gt_path, metadata=False):
         mat = loadmat(gt_path)
         if metadata:
             return mat
-        gt = mat["image_info"][0][0][0].astype(int)
+        gt = mat[gt_key][0][0][0].astype(int) # "image_info"
     elif ext == '.json':
         jsf = loadjson(gt_path)
-        gt = np.array(jsf["image_info"])
+        height = jsf['properties']['height']
+        width = jsf['properties']['width']
+        gt = []
+        for pt in jsf[gt_key]:
+            x_ = round(pt['x'])
+            y_ = round(pt['y'])
+            if x_ < 0 or x_ > width or y_ < 0 or y_ > height:
+                print("POINT INCOHERENT")
+                print('width:', width, 'height:', height)
+                print('x_:', x_, 'y_:', y_)
+            else:
+                gt.append((y_, x_))
+        gt = np.array(gt)
         if metadata:
             return jsf
     else:
@@ -111,16 +129,22 @@ def compute_distances(img_paths,
                       out_folder_path='.', 
                       out_dist_path='distances_dict.pkl', 
                       n_neighbors=4, 
-                      save=True):
+                      save=True,
+                      gt_key='points'):
     
     # calculate distance for each images and each point between theirs n neighbors 
     distances_dict = dict()
     
     for i_path, gt_path in tqdm(zip(img_paths, gt_paths)):
         # load truth values
-        img = plt.imread(i_path)
+        try:
+            img = plt.imread(i_path)
+        except Exception as e:
+            print('Cannot load image:',i_path)
+            continue
         height, width, dim = img.shape
-        points = get_gt_dots(gt_path)
+        points = get_gt_dots(gt_path, gt_key=gt_key)
+        #print('points:',points)
         if len(points) > 0:
             # build tree distances with truth values and add to object
             tree = spatial.KDTree(points.copy()) 
@@ -414,11 +438,18 @@ class DensityMap:
     
         for img_path, gt_path in tqdm(zip(self.imgs_paths, self.gt_paths)):
             # load img and truths values
-            img = Image.open(img_path)
+            try:
+                img = Image.open(img_path)
+            except Exception as e:
+                print('Cannot load image:',img_path)
+                continue
+            
             width, height = img.size
             gt_points = get_gt_dots(gt_path)
             
             if method in (1, 2):
+                if img_path not in distances_dict:
+                    continue
                 distance = distances_dict[img_path]
             
             # compute density map and save it
