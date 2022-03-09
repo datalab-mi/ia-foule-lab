@@ -438,11 +438,18 @@ class DensityMap:
     
         for img_path, gt_path in tqdm(zip(self.imgs_paths, self.gt_paths)):
             # load img and truths values
-            img = Image.open(img_path)
+            try:
+                img = Image.open(img_path)
+            except Exception as e:
+                print('Cannot load image:',img_path)
+                continue
+            
             width, height = img.size
             gt_points = get_gt_dots(gt_path)
             
             if method in (1, 2):
+                if img_path not in distances_dict:
+                    continue
                 distance = distances_dict[img_path]
             
             # compute density map and save it
