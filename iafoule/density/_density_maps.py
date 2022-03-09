@@ -95,7 +95,19 @@ def get_gt_dots(gt_path, metadata=False, gt_key='points'):
         gt = mat[gt_key][0][0][0].astype(int) # "image_info"
     elif ext == '.json':
         jsf = loadjson(gt_path)
-        gt = np.array(jsf[gt_key]) # "image_info"
+        height = jsf['properties']['height']
+        width = jsf['properties']['width']
+        gt = []
+        for pt in jsf[gt_key]:
+            x_ = round(pt['x'])
+            y_ = round(pt['y'])
+            if x_ < 0 or x_ > width or y_ < 0 or y_ > height:
+                print("POINT INCOHERENT")
+                print('width:', width, 'height:', height)
+                print('x_:', x_, 'y_:', y_)
+            else:
+                gt.append((y_, x_))
+        gt = np.array(gt)
         if metadata:
             return jsf
     else:
@@ -117,16 +129,22 @@ def compute_distances(img_paths,
                       out_folder_path='.', 
                       out_dist_path='distances_dict.pkl', 
                       n_neighbors=4, 
-                      save=True):
+                      save=True,
+                      gt_key='points'):
     
     # calculate distance for each images and each point between theirs n neighbors 
     distances_dict = dict()
     
     for i_path, gt_path in tqdm(zip(img_paths, gt_paths)):
         # load truth values
-        img = plt.imread(i_path)
+        try:
+            img = plt.imread(i_path)
+        except Exception as e:
+            print('Cannot load image:',i_path)
+            continue
         height, width, dim = img.shape
-        points = get_gt_dots(gt_path)
+        points = get_gt_dots(gt_path, gt_key=gt_key)
+        #print('points:',points)
         if len(points) > 0:
             # build tree distances with truth values and add to object
             tree = spatial.KDTree(points.copy()) 
