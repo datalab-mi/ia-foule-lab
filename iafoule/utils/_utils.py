@@ -112,8 +112,8 @@ def get_mean_and_std_by_channel_2(loader):
             continue
         b, c, h, w = img.shape
         nb_pixels = b * h * w
-        sum_ = torch.sum(images, dim=[0, 2, 3])
-        sum_of_square = torch.sum(images ** 2,
+        sum_ = torch.sum(img, dim=[0, 2, 3])
+        sum_of_square = torch.sum(img ** 2,
                                   dim=[0, 2, 3])
         fst_moment = (cnt * fst_moment + sum_) / (cnt + nb_pixels)
         snd_moment = (cnt * snd_moment + sum_of_square) / (cnt + nb_pixels)
