@@ -8,14 +8,15 @@ def get_metrics(prediction, ground_truth, metric_grids=None, debug=False):
     if (isinstance(prediction, int) and isinstance(prediction, int)) or (
             isinstance(ground_truth, float) and isinstance(ground_truth, float)):
         metrics['error'] = prediction - ground_truth
-        total = ground_truth
+        nb_total = ground_truth
         metric_grids = []
     else:
         metrics['error'] = prediction.sum() - ground_truth.sum()
-        total = ground_truth.sum()
-
+        nb_total = ground_truth.sum()
+    if nb_total == 0:
+        nb_total = 1
     metrics['absolute_error'] = np.abs(metrics['error'])
-    metrics['absolute_percentage_error'] = 100. * metrics['absolute_error'] / total
+    metrics['absolute_percentage_error'] = 100. * metrics['absolute_error'] / nb_total
     metrics['squared_error'] = metrics['error'] * metrics['error']
     for metric_grid in metric_grids:
         str_metric_grid = str(metric_grid[0]) + 'x' + str(metric_grid[1])
@@ -27,9 +28,12 @@ def get_metrics(prediction, ground_truth, metric_grids=None, debug=False):
 
 def get_metrics_with_points(prediction, ground_truth, metric_grids=None, debug=False):
     metrics = dict()
-    metrics['error'] = prediction.sum() - len(ground_truth)
+    nb_total = len(ground_truth)
+    metrics['error'] = prediction.sum() - nb_total
     metrics['absolute_error'] = np.abs(metrics['error'])
-    metrics['absolute_percentage_error'] = 100. * metrics['absolute_error'] / len(ground_truth)
+    if nb_total == 0:
+        nb_total = 1
+    metrics['absolute_percentage_error'] = 100. * metrics['absolute_error'] / nb_total
     metrics['squared_error'] = metrics['error'] ** 2
     for metric_grid in metric_grids:
         str_metric_grid = str(metric_grid[0]) + 'x' + str(metric_grid[1])
@@ -115,7 +119,7 @@ def get_grid_metrics(prediction_map, ground_truth_map, metric_grid, debug=False)
         print('matrix_ground_truth_map:', matrix_ground_truth_map)
         print('matrix_prediction_map:', matrix_prediction_map)
 
-    matrix_difference = matrix_ground_truth_map - matrix_prediction_map
+    matrix_difference = matrix_prediction_map - matrix_ground_truth_map
 
     if debug:
         print('matrix_difference:', matrix_difference)
@@ -217,7 +221,7 @@ def get_grid_metrics_with_points(prediction_map, ground_truth_points, metric_gri
         print('matrix_ground_truth_points:', matrix_ground_truth_points)
         print('matrix_prediction_map:', matrix_prediction_map)
 
-    matrix_difference = matrix_ground_truth_points - matrix_prediction_map
+    matrix_difference = matrix_prediction_map - matrix_ground_truth_points
 
     if debug:
         print('matrix_difference:', matrix_difference)
