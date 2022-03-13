@@ -3,80 +3,39 @@ import math
 import numpy as np
 
 
-def get_benchmark_metrics(data_iterator, metrics_list=None, metric_grids=None, debug=False):
-    # default metric : mean_absolute_error
-    # you must ask for root_mean_squared_error and by metric_grids pameters all the grid-metrics
-    if metrics_list is None:
-        metrics_list = ['mean_absolute_error']
-    if metric_grids is None:
+def get_metrics(prediction, ground_truth, metric_grids=None, debug=False):
+    metrics = dict()
+    if (isinstance(prediction, int) and isinstance(prediction, int)) or (
+            isinstance(ground_truth, float) and isinstance(ground_truth, float)):
+        metrics['error'] = prediction - ground_truth
+        total = ground_truth
         metric_grids = []
-    metrics = {'mean_absolute_error': []}
-    internal_metrics_list = ['absolute_error']
-    if 'root_mean_squared_error' in metrics_list:
-        metrics['root_mean_squared_error'] = []
-        internal_metrics_list.append('squared_error')
+    else:
+        metrics['error'] = prediction.sum() - ground_truth.sum()
+        total = ground_truth.sum()
+
+    metrics['absolute_error'] = np.abs(metrics['error'])
+    metrics['absolute_percentage_error'] = 100. * metrics['absolute_error'] / total
+    metrics['squared_error'] = metrics['error'] * metrics['error']
     for metric_grid in metric_grids:
         str_metric_grid = str(metric_grid[0]) + 'x' + str(metric_grid[1])
-        metrics['mean_grid' + str_metric_grid + '_absolute_percentage_error'] = []
-        metrics['mean_grid' + str_metric_grid + '_cell_percentage_error'] = []
-    for data in data_iterator:
-        data_type = 'densities'
-        if 'type' in data and data['type'] in ['densities', 'density_points']:
-            data_type = data['type']
-        prediction_map = data['prediction_map']
-        ground_truth = data['ground_truth']
-        if data_type == 'densities':
-            internal_metrics = get_metrics(prediction_map,
-                                           ground_truth,
-                                           metrics_list=internal_metrics_list,
-                                           metric_grids=[],
-                                           debug=debug)
-        else:  # density_points
-            internal_metrics = get_metrics_with_points(prediction_map,
-                                                       ground_truth,
-                                                       metrics_list=internal_metrics_list,
-                                                       metric_grids=[],
-                                                       debug=debug)
-        metrics['mean_absolute_error'].append(internal_metrics['absolute_error'])
-        metrics['root_mean_squared_error'].append(internal_metrics['squared_error'])
-        for metric_grid in metric_grids:
-            str_metric_grid = str(metric_grid[0]) + 'x' + str(metric_grid[1])
-            m1 = 'grid' + str_metric_grid + '_absolute_percentage_error'
-            m2 = 'grid' + str_metric_grid + '_cell_percentage_error'
-            metrics['mean_' + m1].append(internal_metrics[m1])
-            metrics['mean_' + m2].append(internal_metrics[m2])
-
-    metrics['mean_absolute_error'] = np.mean(metrics['mean_absolute_error'])
-
-    metrics['root_mean_squared_error'] = np.mean(metrics['root_mean_squared_error'])
-    metrics['root_mean_squared_error'] = math.sqrt(metrics['root_mean_squared_error'])
-
-    for metric_grid in metric_grids:
-        str_metric_grid = str(metric_grid[0]) + 'x' + str(metric_grid[1])
-        m1 = 'mean_grid' + str_metric_grid + '_absolute_percentage_error'
-        m2 = 'mean_grid' + str_metric_grid + '_cell_percentage_error'
-        metrics[m1] = np.mean(metrics[m1])
-        metrics[m2] = np.mean(metrics[m2])
-
+        gape, gcae = get_grid_metrics(prediction, ground_truth, metric_grid, debug=debug)
+        metrics['grid' + str_metric_grid + '_absolute_percentage_error'] = gape
+        metrics['grid' + str_metric_grid + '_cell_absolute_error'] = gape
     return metrics
 
 
-def get_metrics(prediction_map, ground_truth_map, metrics_list=None, metric_grids=None, debug=False):
-    if metrics_list is None:
-        metrics_list = ['error']
-    if metric_grids is None:
-        metric_grids = []
+def get_metrics_with_points(prediction, ground_truth, metric_grids=None, debug=False):
     metrics = dict()
-    metrics['error'] = ground_truth_map.sum() - prediction_map.sum()
-    if 'absolute_error' in metrics_list:
-        metrics['absolute_error'] = np.abs(metrics['error'])
-    if 'squared_error' in metrics_list:
-        metrics['squared_error'] = metrics['error'] * metrics['error']
+    metrics['error'] = prediction.sum() - len(ground_truth)
+    metrics['absolute_error'] = np.abs(metrics['error'])
+    metrics['absolute_percentage_error'] = 100. * metrics['absolute_error'] / len(ground_truth)
+    metrics['squared_error'] = metrics['error'] ** 2
     for metric_grid in metric_grids:
         str_metric_grid = str(metric_grid[0]) + 'x' + str(metric_grid[1])
-        gape, gcae = get_grid_metrics(prediction_map, ground_truth_map, metric_grid, debug=debug)
+        gape, gcae = get_grid_metrics_with_points(prediction, ground_truth, metric_grid, debug=debug)
         metrics['grid' + str_metric_grid + '_absolute_percentage_error'] = gape
-        metrics['grid' + str_metric_grid + '_cell_percentage_error'] = gape
+        metrics['grid' + str_metric_grid + '_cell_absolute_error'] = gape
     return metrics
 
 
@@ -174,7 +133,7 @@ def get_grid_metrics(prediction_map, ground_truth_map, metric_grid, debug=False)
         print('gt_nb_person:', gt_nb_person)
 
     # grid absolute percentage error
-    gape = matrix_final.sum() / gt_nb_person
+    gape = 100. * matrix_final.sum() / gt_nb_person
     if debug:
         print('gape:', gape)
 
@@ -184,25 +143,6 @@ def get_grid_metrics(prediction_map, ground_truth_map, metric_grid, debug=False)
         print('gcae:', gcae)
 
     return gape, gcae
-
-
-def get_metrics_with_points(prediction_map, ground_truth_points, metrics_list=None, metric_grids=None, debug=False):
-    if metrics_list is None:
-        metrics_list = ['error']
-    if metric_grids is None:
-        metric_grids = []
-    metrics = dict()
-    metrics['error'] = len(ground_truth_points) - prediction_map.sum()
-    if 'absolute_error' in metrics_list:
-        metrics['absolute_error'] = np.abs(metrics['error'])
-    if 'squared_error' in metrics_list:
-        metrics['squared_error'] = metrics['error'] ** 2
-    for metric_grid in metric_grids:
-        str_metric_grid = str(metric_grid[0]) + 'x' + str(metric_grid[1])
-        gape, gcae = get_grid_metrics_with_points(prediction_map, ground_truth_points, metric_grid, debug=debug)
-        metrics['grid' + str_metric_grid + '_absolute_percentage_error'] = gape
-        metrics['grid' + str_metric_grid + '_cell_percentage_error'] = gape
-    return metrics
 
 
 def get_grid_metrics_with_points(prediction_map, ground_truth_points, metric_grid, debug=False):
@@ -295,7 +235,7 @@ def get_grid_metrics_with_points(prediction_map, ground_truth_points, metric_gri
         print('gt_nb_person:', gt_nb_person)
 
     # grid absolute percentage error
-    gape = matrix_final.sum() / gt_nb_person
+    gape = 100. * matrix_final.sum() / gt_nb_person
     if debug:
         print('gape:', gape)
 
@@ -305,3 +245,56 @@ def get_grid_metrics_with_points(prediction_map, ground_truth_points, metric_gri
         print('gcae:', gcae)
 
     return gape, gcae
+
+
+def get_benchmark_metrics(data_iterator, metric_grids=None, debug=False):
+    grid_metrics_initialized = False
+    metrics = {'mean_absolute_error': [], 'mean_absolute_percentage_error': [], 'root_mean_squared_error': []}
+    for data in data_iterator:
+        prediction = data['prediction']
+        ground_truth = data['ground_truth']
+        ground_truth_type = data['ground_truth_type']
+        if ground_truth_type == 'values':
+            metric_grids = []
+        elif not grid_metrics_initialized:
+            for metric_grid in metric_grids:
+                str_metric_grid = str(metric_grid[0]) + 'x' + str(metric_grid[1])
+                m1 = 'grid' + str_metric_grid + '_absolute_percentage_error'
+                m2 = 'grid' + str_metric_grid + '_cell_absolute_error'
+                metrics['mean_' + m1] = []
+                metrics['mean_' + m2] = []
+            grid_metrics_initialized = True
+        if ground_truth_type == 'points':
+            internal_metrics = get_metrics_with_points(prediction,
+                                                       ground_truth,
+                                                       metric_grids=metric_grids,
+                                                       debug=debug)
+        elif ground_truth_type in ['density_maps', 'values']:  # density_maps or int or float
+            internal_metrics = get_metrics(prediction,
+                                           ground_truth,
+                                           metric_grids=metric_grids,
+                                           debug=debug)
+        metrics['mean_absolute_error'].append(internal_metrics['absolute_error'])
+        metrics['mean_absolute_percentage_error'].append(internal_metrics['absolute_percentage_error'])
+        metrics['root_mean_squared_error'].append(internal_metrics['squared_error'])
+        for metric_grid in metric_grids:
+            str_metric_grid = str(metric_grid[0]) + 'x' + str(metric_grid[1])
+            m1 = 'grid' + str_metric_grid + '_absolute_percentage_error'
+            m2 = 'grid' + str_metric_grid + '_cell_absolute_error'
+            metrics['mean_' + m1].append(internal_metrics[m1])
+            metrics['mean_' + m2].append(internal_metrics[m2])
+
+    metrics['mean_absolute_error'] = np.mean(metrics['mean_absolute_error'])
+    metrics['mean_absolute_percentage_error'] = np.mean(metrics['mean_absolute_percentage_error'])
+
+    metrics['root_mean_squared_error'] = np.mean(metrics['root_mean_squared_error'])
+    metrics['root_mean_squared_error'] = math.sqrt(metrics['root_mean_squared_error'])
+
+    for metric_grid in metric_grids:
+        str_metric_grid = str(metric_grid[0]) + 'x' + str(metric_grid[1])
+        m1 = 'mean_grid' + str_metric_grid + '_absolute_percentage_error'
+        m2 = 'mean_grid' + str_metric_grid + '_cell_absolute_error'
+        metrics[m1] = np.mean(metrics[m1])
+        metrics[m2] = np.mean(metrics[m2])
+
+    return metrics

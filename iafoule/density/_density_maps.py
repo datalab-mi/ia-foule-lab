@@ -1,23 +1,19 @@
-import glob
 import pickle
 import os
 import json
 import h5py
 import logging
 import pathlib
-import gc
 
 from contextlib import closing
 from pathlib import Path
 from tqdm import tqdm
-#from tqdm.notebook import tqdm as notebook_tqdm
 from scipy.io import loadmat
 from scipy.ndimage import gaussian_filter
 from scipy import spatial
 from PIL import Image
 
 import scipy
-import cv2
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -494,3 +490,7 @@ def show_image_with_density(density_map, df_paths,
     plt.axis('off')
     print(f'Image n°{str(label)}\nDensity de personne : {np.round(density_map[label].sum(), 3)}'
           f'\nNombre de personne {n_person}')
+
+
+def load_sparse(filename):
+    return scipy.sparse.load_npz(filename).toarray()
