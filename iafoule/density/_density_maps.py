@@ -494,3 +494,5 @@ def show_image_with_density(density_map, df_paths,
 
 def load_sparse(filename):
     return scipy.sparse.load_npz(filename).toarray()
+
+
