@@ -96,8 +96,7 @@ def get_mean_and_std_by_channel(loader):
     std = (channels_squared_sum / num_batches - mean ** 2) ** 0.5
     return list(mean.numpy()), list(std.numpy())
 
-
-"""
+#Similar as the previous function
 def get_mean_and_std_by_channel_2(loader):
     # Compute the mean and sd in an online fashion
     # Var[x] = E[X^2] - E^2[X]
@@ -121,4 +120,3 @@ def get_mean_and_std_by_channel_2(loader):
 
     mean, std = fst_moment, torch.sqrt(snd_moment - fst_moment ** 2)
     return list(mean.numpy()), list(std.numpy())
-"""
