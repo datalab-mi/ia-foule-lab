@@ -257,8 +257,10 @@ def get_benchmark_metrics(data_iterator, metric_grids=None, debug=False):
     for data in data_iterator:
         prediction = data['prediction']
         ground_truth = data['ground_truth']
-        ground_truth_type = data['ground_truth_type']
-        if ground_truth_type == 'values':
+        ground_truth_type = 'values'
+        if 'ground_truth_type' in data:
+            ground_truth_type = data['ground_truth_type']
+        if ground_truth_type == 'values' or metric_grids is None:
             metric_grids = []
         elif not grid_metrics_initialized:
             for metric_grid in metric_grids:
