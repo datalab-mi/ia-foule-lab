@@ -6,14 +6,19 @@ import numpy as np
 def get_metrics(prediction, ground_truth, metric_grids=None):
     """
     get metrics between prediction and ground truth for following types (int, float, np array)
-    metrics are absolute_error (AE), absolute_percentage_error (APE), squared_error (SE)
-    and for metrics grid (only for np array) gridNxN_absolute_percentage_error (GAPE) and  gridNxN_cell_absolute_error (GCAE) 
+    metrics are :
+    absolute_error (AE)
+    absolute_percentage_error (APE)
+    squared_error (SE)
+    and for metrics grid (only for np array) :
+    gridNxN_absolute_percentage_error (GAPE)
+    gridNxN_cell_absolute_error (GCAE)
     args:
         - prediction: prediction value (int, float, np array)
         - ground_truth: ground truth value (int, float, np array)
         - metric_grids: List of tuple [(2,2),(4,4)], default None.
     """
-    
+
     metrics = dict()
     if metric_grids is None:
         metric_grids = []
@@ -41,14 +46,19 @@ def get_metrics(prediction, ground_truth, metric_grids=None):
 def get_metrics_with_points(prediction, ground_truth, metric_grids=None):
     """
     get metrics between prediction (np array) and ground truth (list of points)
-    metrics are absolute_error (AE), absolute_percentage_error (APE), squared_error (SE)
-    and for metrics grid (only for np array) gridNxN_absolute_percentage_error (GAPE) and  gridNxN_cell_absolute_error (GCAE) 
+    metrics are :
+    absolute_error (AE)
+    absolute_percentage_error (APE)
+    squared_error (SE)
+    and for metrics grid (only for np array) :
+    gridNxN_absolute_percentage_error (GAPE)
+    gridNxN_cell_absolute_error (GCAE)
     args:
         - prediction: prediction value (np array)
         - ground_truth: list of points [(x1,y1), (x2,y2),...]
         - metric_grids: List of tuple [(2,2),(4,4)], default None.
     """
-    
+
     metrics = dict()
     nb_total = len(ground_truth)
     metrics['error'] = prediction.sum() - nb_total
@@ -203,7 +213,6 @@ def get_grid_metrics_with_points(prediction_map, ground_truth_points, metric_gri
             sub_prediction_map = prediction_map[y_start:y_stop, x_start:x_stop]
             matrix_prediction_map[iw, ih] = sub_prediction_map.sum()
 
-
     matrix_difference = matrix_prediction_map - matrix_ground_truth_points
 
     matrix_final = matrix_difference.round()
@@ -234,7 +243,8 @@ def get_benchmark_metrics(data_iterator, metric_grids=None):
     mean gridNxN_absolute_percentage_error (MGAPE) 
     gridNxN_cell_absolute_error (MGCAE) 
     args:
-        - data_iterator (iterator) : The iterator must flow list of predictions, ground truths and precise the type of ground truth
+        - data_iterator (iterator) : The iterator must flow list of predictions, ground truths
+                                     and precise the type of ground truth (see table below)
             
             def data_iterator(predictions, ground_truths, ground_truth_type):
                 for i, value in enumerate(predictions):
@@ -244,11 +254,11 @@ def get_benchmark_metrics(data_iterator, metric_grids=None):
                            'prediction':prediction,
                            'ground_truth':ground_truth}
         
-        prediction type     ground truth                                 ground_truth_type             metric_grids
-         np array            np arrray                                      density_maps                 List of tuple [(2,2),(4,4)], default None.
-         np array            list of points [(x1,y1), (x2,y2),...]          points                       List of tuple [(2,2),(4,4)], default None.
-         float               float                                          values                       None
-         int                 int                                            values                       None
+    prediction type     ground truth                            ground_truth_type   metric_grids (default None)
+    np array            np arrray                               density_maps        List of tuple [(2,2),(4,4),...]
+    np array            list of points [(x1,y1), (x2,y2),...]   points              List of tuple [(2,2),(4,4),...]
+    float               float                                   values              None
+    int                 int                                     values              None
         - ground_truth_map (array) : ground_truth value
         - metric_grids: List of tuple [(2,2),(4,4)], default None.
     """
@@ -270,6 +280,7 @@ def get_benchmark_metrics(data_iterator, metric_grids=None):
                 metrics['mean_' + m1] = []
                 metrics['mean_' + m2] = []
             grid_metrics_initialized = True
+        internal_metrics = dict()
         if ground_truth_type == 'points':
             internal_metrics = get_metrics_with_points(prediction,
                                                        ground_truth,
