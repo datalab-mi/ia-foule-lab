@@ -29,7 +29,7 @@ class CCModelInference:
             return
 
         try:
-            module = importlib.import_module("ccmodels." + module_name)
+            module = importlib.import_module("iafoule.ccmodels." + module_name)
             class_ = getattr(module, self.class_name)
             self.ccmodel = class_(model_path=model_path)
 
