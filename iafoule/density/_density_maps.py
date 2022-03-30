@@ -496,3 +496,26 @@ def load_sparse(filename):
     return scipy.sparse.load_npz(filename).toarray()
 
 
+def image_with_density_map(image, density_map, alpha_type='std', alpha_weight=0.5, factor=1.0):
+    cmap = plt.get_cmap('jet')
+    if alpha_type == 'constant':
+        alpha = alpha_weight
+    elif alpha_type == 'std':
+        alpha = (density_map > density_map.std()*factor) * alpha_weight
+    elif alpha_type == 'mean':
+        alpha = (density_map > density_map.mean()*factor) * alpha_weight
+    elif alpha_type == 'max':
+        alpha = (density_map / density_map.max()) * alpha_weight
+    elif alpha_type == 'neg':
+        alpha = (density_map<0.) * alpha_weight
+        density_map = -1*density_map
+    rgba_img = cmap(density_map / density_map.max(), alpha=alpha, bytes=True)
+    dm_image = Image.fromarray(rgba_img, mode='RGBA')
+    
+    new_size = (image.size[0], image.size[1])
+    dm_image = dm_image.resize(new_size)
+    image_final = image.copy()
+    image_final = image_final.convert('RGB')
+    image_final.paste(dm_image, (0,0), dm_image)
+        
+    return image_final
