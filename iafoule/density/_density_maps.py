@@ -18,7 +18,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
 def create_logger():
     # logger
     logger = logging.getLogger()
@@ -497,6 +496,19 @@ def load_sparse(filename):
 
 
 def image_with_density_map(image, density_map, alpha_type='std', alpha_weight=0.5, factor=1.0):
+     
+    if not isinstance(image, Image.Image) or not isinstance(density_map, np.ndarray) :
+        return None, None
+    
+    if alpha_type not in ('constant','std','mean','max','neg'):
+        alpha_type = 'std'
+
+    if alpha_weight<0. or alpha_weight>1.:
+        alpha_weight=0.5
+        
+    if factor<0. or factor>1.:
+        factor=1.
+    
     cmap = plt.get_cmap('jet')
     if alpha_type == 'constant':
         alpha = alpha_weight
@@ -508,14 +520,17 @@ def image_with_density_map(image, density_map, alpha_type='std', alpha_weight=0.
         alpha = (density_map / density_map.max()) * alpha_weight
     elif alpha_type == 'neg':
         alpha = (density_map<0.) * alpha_weight
-        density_map = -1*density_map
+        density_map = -1.*density_map*alpha
+        
+    # print("sum:",density_map.sum(), "max:",density_map.max())
     rgba_img = cmap(density_map / density_map.max(), alpha=alpha, bytes=True)
-    dm_image = Image.fromarray(rgba_img, mode='RGBA')
+    img_dm = Image.fromarray(rgba_img, mode='RGBA')
     
     new_size = (image.size[0], image.size[1])
-    dm_image = dm_image.resize(new_size)
-    image_final = image.copy()
-    image_final = image_final.convert('RGB')
-    image_final.paste(dm_image, (0,0), dm_image)
-        
-    return image_final
+    img_dm = img_dm.resize(new_size)
+
+    img_with_dm = image.copy()
+    img_with_dm = img_with_dm.convert('RGB')
+    img_with_dm.paste(img_dm, (0,0), img_dm)
+
+    return img_with_dm, img_dm
