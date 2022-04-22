@@ -1,6 +1,7 @@
 import cv2, os
 from random import randrange
 from datetime import timedelta, datetime
+from PIL import ImageFont, ImageDraw
 
 def random_date():
     start = datetime.strptime('1/1/2000 1:30 PM', '%m/%d/%Y %I:%M %p')
@@ -9,7 +10,7 @@ def random_date():
     delta = end - start
     int_delta = (delta.days * 24 * 60 * 60) + delta.seconds
     random_second = randrange(int_delta)
-    return (start + timedelta(seconds=random_second) ).strftime(format="%m/%d/%Y, %H:%M:%S")
+    return (start + timedelta(seconds=random_second) ).strftime(format="%d/%m/%Y %H:%M:%S")
 
 def write(x, y, text, img):
     """
@@ -45,3 +46,30 @@ def write(x, y, text, img):
         fontColor,
         lineType)
     return img
+
+
+def write_texts(image, text2add):
+    if text2add!='':
+        draw = ImageDraw.Draw(image)
+        text = text2add
+        x= 2
+        y = 92
+        x = int(x * image.size[0] / 100 )
+        y =  int(y * image.size[1] / 100 )
+        font_size = int(image.size[1] / 20)
+        font = ImageFont.truetype('DejaVuSerif.ttf', size=font_size)
+        #print(image.size,x, y, font_size, text)
+        draw.text((x, y), text, fill='white', font=font,
+               stroke_width=2, stroke_fill='black')
+
+        text = random_date()
+        x= 66 + (4*(image.size[0] - 1980)/512)
+        y = 92
+        x = int(x * image.size[0] / 100 )
+        y =  int(y * image.size[1] / 100 )
+        font_size = int(image.size[1] / 20)
+        font = ImageFont.truetype('DejaVuSerif.ttf', size=font_size)
+        #print(image.size,x, y, font_size, text)
+        draw.text((x, y), text, fill='white', font=font,
+               stroke_width=2, stroke_fill='black')
+    return image
