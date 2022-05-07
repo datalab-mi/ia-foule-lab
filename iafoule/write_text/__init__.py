@@ -1,1 +1,1 @@
-from ._write_text import random_date, write
+from ._write_text import random_date, write, write_texts
