@@ -310,6 +310,9 @@ def gaussian_filter_density(points,
         # more person are in the same place, more values is highers
         density_map[min_img_x:max_img_x, min_img_y:max_img_y] += kernel[
             kernel_x_min:kernel_x_max, kernel_y_min:kernel_y_max]
+        
+        assert density_map.shape == (map_h, map_w)
+        
     return density_map
 
 
