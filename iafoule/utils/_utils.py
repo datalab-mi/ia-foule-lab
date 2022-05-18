@@ -82,7 +82,7 @@ def get_mean_and_std_by_channel(loader):
 
     for i, data in tqdm(enumerate(loader, 0)):
 
-        img, gt_map = data
+        img, gt_map, _ = data
         if img is None:
             continue
         # Mean over batch, height and width, but not over the channels
@@ -106,7 +106,7 @@ def get_mean_and_std_by_channel_2(loader):
 
     for i, data in tqdm(enumerate(loader, 0)):
 
-        img, gt_map = data
+        img, gt_map, _ = data
         if img is None:
             continue
         b, c, h, w = img.shape
